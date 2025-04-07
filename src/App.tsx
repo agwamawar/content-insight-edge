@@ -1,33 +1,32 @@
 
+import * as React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
-import History from "./pages/History";
-import Results from "./pages/Results";
-import NotFound from "./pages/NotFound";
+import Navigation from "@/components/Navigation";
+import HomePage from "@/pages/HomePage";
+import LoginPage from "@/pages/LoginPage";
+import ResultsPage from "@/pages/ResultsPage";
+import HistoryPage from "@/pages/HistoryPage";
 
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+function App() {
+  return (
+    <ThemeProvider defaultTheme="light" storageKey="viral-analytics-theme">
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/results/:id" element={<Results />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Navigation />
+        <main className="min-h-[calc(100vh-4rem)]">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/results/:id" element={<ResultsPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </main>
+        <Toaster />
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+    </ThemeProvider>
+  );
+}
 
 export default App;

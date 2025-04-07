@@ -9,6 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      video_analysis: {
+        Row: {
+          created_at: string
+          embeddings: number[] | null
+          emotional_tone: string | null
+          id: string
+          suggestions: string[] | null
+          transcript: string | null
+          user_id: string | null
+          video_url: string
+          virality_score: number | null
+          vision_analysis: string | null
+        }
+        Insert: {
+          created_at?: string
+          embeddings?: number[] | null
+          emotional_tone?: string | null
+          id?: string
+          suggestions?: string[] | null
+          transcript?: string | null
+          user_id?: string | null
+          video_url: string
+          virality_score?: number | null
+          vision_analysis?: string | null
+        }
+        Update: {
+          created_at?: string
+          embeddings?: number[] | null
+          emotional_tone?: string | null
+          id?: string
+          suggestions?: string[] | null
+          transcript?: string | null
+          user_id?: string | null
+          video_url?: string
+          virality_score?: number | null
+          vision_analysis?: string | null
+        }
+        Relationships: []
+      }
       virality_analysis: {
         Row: {
           created_at: string
