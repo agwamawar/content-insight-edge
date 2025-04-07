@@ -43,8 +43,28 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Get the authorization header to extract user ID
+    const authHeader = req.headers.get('Authorization');
+    let userId = null;
+    
+    // If auth header exists, extract the JWT token and get user ID
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      
+      // Create Supabase admin client
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') || 'https://mybozyryjekltdgdvots.supabase.co',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+      );
+      
+      // Verify the token and get user ID
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && user) {
+        userId = user.id;
+      }
+    }
+
     // Get the Google Cloud service account key from Supabase secrets
-    // In production, you would store this as a Supabase secret
     const GOOGLE_CLOUD_KEY = Deno.env.get('GOOGLE_CLOUD_KEY');
     
     if (!GOOGLE_CLOUD_KEY) {
@@ -158,8 +178,38 @@ Deno.serve(async (req) => {
       };
     }
 
-    // Return the analysis result
-    return new Response(JSON.stringify(analysisResult), {
+    // Store the analysis result in the database
+    let savedAnalysis = null;
+    if (userId) {
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') || 'https://mybozyryjekltdgdvots.supabase.co',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+      );
+      
+      const { data, error } = await supabaseAdmin
+        .from('virality_analysis')
+        .insert({
+          user_id: userId,
+          original_text: text,
+          virality_score: analysisResult.viralityScore,
+          emotional_tone: analysisResult.emotionalTone,
+          suggestions: analysisResult.suggestions,
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Database Error:', error);
+      } else {
+        savedAnalysis = data;
+      }
+    }
+
+    // Return the analysis result along with the database record if available
+    return new Response(JSON.stringify({
+      ...analysisResult,
+      savedRecord: savedAnalysis
+    }), {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',

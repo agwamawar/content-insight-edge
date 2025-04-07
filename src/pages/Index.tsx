@@ -1,17 +1,46 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, TrendingUp } from "lucide-react";
 import ContentAnalysisResult from "@/components/ContentAnalysisResult";
 import Header from "@/components/Header";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Index = () => {
   const [content, setContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [error, setError] = useState("");
+  const [token, setToken] = useState(null);
+
+  useEffect(() => {
+    // Get the session token when the component mounts
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setToken(session.access_token);
+      }
+    };
+    
+    getSession();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setToken(session.access_token);
+      } else {
+        setToken(null);
+      }
+    });
+    
+    // Clean up the subscription
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleAnalyzeContent = async () => {
     if (!content.trim()) return;
@@ -20,14 +49,14 @@ const Index = () => {
     setError("");
     
     try {
-      // This will call your Supabase Edge Function once it's deployed
+      // Call the Supabase Edge Function with the project ID
       const response = await fetch(
-        "https://YOUR_SUPABASE_PROJECT_ID.supabase.co/functions/v1/analyze-content",
+        "https://mybozyryjekltdgdvots.supabase.co/functions/v1/analyze-content",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            // Add authorization headers if needed
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
           },
           body: JSON.stringify({ text: content }),
         }
@@ -39,9 +68,16 @@ const Index = () => {
 
       const data = await response.json();
       setAnalysisResult(data);
+      
+      if (data.savedRecord) {
+        toast.success("Analysis saved to your account");
+      } else if (token) {
+        toast.warning("Couldn't save analysis to your account");
+      }
     } catch (err) {
       console.error("Analysis failed:", err);
       setError("Failed to analyze content. Please try again later.");
+      toast.error("Analysis failed");
     } finally {
       setIsAnalyzing(false);
     }
@@ -60,6 +96,11 @@ const Index = () => {
             </CardTitle>
             <CardDescription>
               Analyze your social media content to maximize engagement and reach
+              {!token && (
+                <p className="mt-2 text-amber-600">
+                  <strong>Note:</strong> Sign in to save your analysis results.
+                </p>
+              )}
             </CardDescription>
           </CardHeader>
           
