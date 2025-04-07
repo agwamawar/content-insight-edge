@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
     }
 
     // Store the analysis result in the database
-    let savedAnalysis = null;
+    let savedRecord = null;
     if (userId) {
       const supabaseAdmin = createClient(
         Deno.env.get('SUPABASE_URL') || 'https://mybozyryjekltdgdvots.supabase.co',
@@ -201,14 +201,14 @@ Deno.serve(async (req) => {
       if (error) {
         console.error('Database Error:', error);
       } else {
-        savedAnalysis = data;
+        savedRecord = data;
       }
     }
 
     // Return the analysis result along with the database record if available
     return new Response(JSON.stringify({
       ...analysisResult,
-      savedRecord: savedAnalysis
+      savedRecord: savedRecord
     }), {
       headers: {
         'Content-Type': 'application/json',
