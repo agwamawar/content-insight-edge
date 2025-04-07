@@ -1,12 +1,10 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, TrendingUp, LogOut } from "lucide-react";
-import ContentAnalysisResult from "@/components/ContentAnalysisResult";
-import AnalysisHistory from "@/components/AnalysisHistory";
+import { Loader2, TrendingUp, LogIn, History } from "lucide-react";
 import Header from "@/components/Header";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -14,60 +12,39 @@ import { toast } from "sonner";
 const Index = () => {
   const [content, setContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [error, setError] = useState("");
-  const [token, setToken] = useState(null);
-  const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Get the session token when the component mounts
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setToken(session.access_token);
-        setUser(session.user);
-      } else {
-        // Redirect to auth page if not logged in
-        navigate("/auth");
-      }
-    };
-    
-    getSession();
-    
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        setToken(session.access_token);
-        setUser(session.user);
-      } else {
-        setToken(null);
-        setUser(null);
-        navigate("/auth");
-      }
-    });
-    
-    // Clean up the subscription
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate]);
-
   const handleAnalyzeContent = async () => {
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      toast.error("Please enter some content to analyze");
+      return;
+    }
 
     setIsAnalyzing(true);
-    setError("");
     
     try {
-      // Call the Supabase Edge Function with the project ID
+      // Check if user is logged in
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // Save content to session storage to resume after auth
+        sessionStorage.setItem('pendingAnalysisContent', content);
+        // Redirect to auth page
+        navigate("/auth", { state: { returnTo: "/" } });
+        return;
+      }
+
+      // User is logged in, proceed with analysis
+      const token = session.access_token;
+      
+      // Call the Supabase Edge Function
       const response = await fetch(
         "https://mybozyryjekltdgdvots.supabase.co/functions/v1/analyze-content",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({ text: content }),
         }
@@ -78,62 +55,59 @@ const Index = () => {
       }
 
       const data = await response.json();
-      setAnalysisResult(data);
       
       if (data.savedRecord) {
-        toast.success("Analysis saved to your account");
-      } else if (token) {
-        toast.warning("Couldn't save analysis to your account");
+        // Redirect to the results page
+        navigate(`/results/${data.savedRecord.id}`);
+        toast.success("Analysis complete!");
+      } else {
+        throw new Error("Could not save analysis results");
       }
+      
     } catch (err) {
       console.error("Analysis failed:", err);
-      setError("Failed to analyze content. Please try again later.");
-      toast.error("Analysis failed");
+      toast.error("Failed to analyze content. Please try again later.");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast.success("Logged out successfully");
-    navigate("/auth");
+  const handleViewHistory = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      toast.error("Please sign in to view your history");
+      navigate("/auth", { state: { returnTo: "/" } });
+      return;
+    }
+    
+    navigate("/history");
   };
 
-  // Show loading state while checking auth
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-indigo-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
+  const handleSignIn = () => {
+    navigate("/auth", { state: { returnTo: "/" } });
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-indigo-50">
       <Header />
       
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Content Analysis Dashboard</h1>
-          <Button 
-            variant="outline" 
-            onClick={handleLogout}
-            className="flex items-center gap-2"
-          >
-            <LogOut className="h-4 w-4" />
-            Sign Out
-          </Button>
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">Content Insight Edge</h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Analyze your social media content with AI to maximize engagement and reach
+          </p>
         </div>
         
-        <Card className="shadow-lg">
+        <Card className="shadow-lg max-w-2xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
+            <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
               <TrendingUp className="h-6 w-6 text-indigo-600" />
-              Content Insight Edge
+              Analyze Your Content
             </CardTitle>
-            <CardDescription>
-              Analyze your social media content to maximize engagement and reach
+            <CardDescription className="text-center">
+              Paste your social media text to get AI-powered engagement insights
             </CardDescription>
           </CardHeader>
           
@@ -145,20 +119,14 @@ const Index = () => {
                 onChange={(e) => setContent(e.target.value)}
                 className="min-h-[150px] text-base"
               />
-              
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-              
-              {analysisResult && (
-                <ContentAnalysisResult result={analysisResult} />
-              )}
             </div>
           </CardContent>
           
-          <CardFooter>
+          <CardFooter className="flex flex-col gap-4">
             <Button 
               onClick={handleAnalyzeContent} 
               disabled={!content.trim() || isAnalyzing}
-              className="bg-indigo-600 hover:bg-indigo-700"
+              className="bg-indigo-600 hover:bg-indigo-700 w-full"
             >
               {isAnalyzing ? (
                 <>
@@ -166,15 +134,31 @@ const Index = () => {
                   Analyzing...
                 </>
               ) : (
-                "Analyze Content"
+                "Analyze My Content"
               )}
             </Button>
+            
+            <div className="flex w-full gap-4 flex-col sm:flex-row">
+              <Button 
+                variant="outline" 
+                onClick={handleViewHistory}
+                className="flex items-center gap-2 w-full"
+              >
+                <History className="h-4 w-4" />
+                View Analysis History
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                onClick={handleSignIn}
+                className="flex items-center gap-2 w-full"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign In
+              </Button>
+            </div>
           </CardFooter>
         </Card>
-        
-        {user && (
-          <AnalysisHistory />
-        )}
       </main>
       
       <footer className="container mx-auto p-4 text-center text-gray-500 text-sm">
